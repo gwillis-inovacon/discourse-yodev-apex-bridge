@@ -1,0 +1,7 @@
+en:
+  theme_metadata:
+    description: "Shows anonymous readers a contextual link to the yoDEV homepage at the end of a topic, so search traffic that lands on the community discovers the product."
+    settings:
+      apex_url: "The yoDEV homepage this CTA links to. Blank disables the component."
+      ref_value: "Value of the ?ref= parameter, used for attribution."
+      enabled: "Render the CTA."

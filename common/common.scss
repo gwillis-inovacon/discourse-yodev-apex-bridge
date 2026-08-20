@@ -1,0 +1,84 @@
+// Settings → plain <script>, via CSS custom properties. SCSS interpolation
+// works in Discourse theme components (#{$setting_name}); ERB in head_tag.html
+// does not, and `<script type="text/discourse-plugin">` does not execute on
+// this setup. Same bridge the other yoDEV components use.
+:root {
+  --yodev-apex-bridge-url: "#{$apex_url}";
+  --yodev-apex-bridge-ref: "#{$ref_value}";
+  --yodev-apex-bridge-enabled: #{if($enabled, 1, 0)};
+}
+
+// Styled from Discourse's own theme variables rather than yoDEV brand colours.
+// A block that ignores the forum's palette reads as an ad and gets skipped;
+// one that belongs to the page gets read. It also means this survives a theme
+// or colour-scheme change without edits, including dark mode.
+.yodev-apex-bridge {
+  display: block;
+  margin: 1.5em 0;
+  padding: 1.25em 1.5em;
+  border: 1px solid var(--primary-low);
+  border-left: 3px solid var(--tertiary);
+  border-radius: 4px;
+  background: var(--primary-very-low);
+
+  &__title {
+    margin: 0 0 0.4em;
+    font-weight: 700;
+    color: var(--primary);
+    line-height: 1.3;
+  }
+
+  &__body {
+    margin: 0 0 1em;
+    color: var(--primary-medium);
+    font-size: 0.95em;
+    line-height: 1.5;
+  }
+
+  &__cta {
+    display: inline-block;
+    padding: 0.6em 1.2em;
+    border-radius: 4px;
+    background: var(--tertiary);
+    // White rather than var(--secondary). Discourse's own button pattern is
+    // tertiary-on-secondary, but measured against the live forum theme that
+    // gives 4.24:1 at 16px/600 — under the 4.5:1 AA threshold, and 16px
+    // semi-bold does not qualify as large text. White on the same accent
+    // measures 4.70:1 and passes. It is also the treatment the brand uses for
+    // this colour.
+    //
+    // ⚠️ Measured against the CURRENT (dark) forum theme. On a light theme with
+    // a paler --tertiary, white could fall below the threshold — re-measure if
+    // the colour scheme changes.
+    color: #fff;
+    font-weight: 600;
+    text-decoration: none;
+
+    &:hover,
+    &:focus {
+      background: var(--tertiary-hover, var(--tertiary));
+      color: #fff;
+      text-decoration: none;
+    }
+
+    // Discourse's own focus treatment is easy to lose on a custom control.
+    &:focus-visible {
+      outline: 2px solid var(--tertiary);
+      outline-offset: 2px;
+    }
+  }
+}
+
+// The topic list below is dense; on narrow screens the CTA needs room to
+// breathe or it reads as part of the first suggested topic.
+@media (max-width: 600px) {
+  .yodev-apex-bridge {
+    padding: 1em;
+    margin: 1.25em 0;
+
+    &__cta {
+      display: block;
+      text-align: center;
+    }
+  }
+}

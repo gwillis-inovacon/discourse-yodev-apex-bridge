@@ -1,0 +1,17 @@
+apex_url:
+  type: string
+  default: "https://yodev.dev"
+  description:
+    en: "The yoDEV homepage (apex) this CTA links to. NOT the community host. Blank disables the component entirely."
+
+ref_value:
+  type: string
+  default: "comm-topic-end"
+  description:
+    en: "Value of the ?ref= parameter appended to every link. YOD-478 captures this on landing and merges it into every GA event, so signups are attributable to this placement rather than just clicks. Change it only if you want a placement to be reported separately."
+
+enabled:
+  type: bool
+  default: true
+  description:
+    en: "Render the CTA. Turn off to remove it without uninstalling the component."

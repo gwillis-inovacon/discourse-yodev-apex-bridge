@@ -1,0 +1,283 @@
+<script>
+  (function () {
+    // yoDEV Apex Bridge — YOD-479.
+    //
+    // ~439 anonymous readers a month reach the community from Google, read an
+    // article, and leave without learning the product exists. The apex is
+    // indexed and healthy but ranks for nothing, because its sitemap holds one
+    // URL and nothing has ever pointed at it. This puts a contextual CTA at the
+    // end of a topic, for anonymous readers only.
+    //
+    // Deliberately NOT a redirect. Post URLs must keep landing on the post: the
+    // ranking belongs to the article's content, and intercepting search traffic
+    // would forfeit it and read as cloaking.
+    //
+    // Built as manual DOM injection rather than `api.renderInOutlet`, because
+    // `<script type="text/discourse-plugin">` was found not to execute on this
+    // Discourse setup — the same reason the beta-offer and activation-redirect
+    // components inject directly. Settings arrive via CSS custom properties
+    // written by common.scss.
+
+    var LOG = "[yodev-apex-bridge] ";
+    var NODE_ID = "yodev-apex-bridge";
+
+    function readCssVar(name) {
+      var v = (
+        getComputedStyle(document.documentElement).getPropertyValue(name) || ""
+      ).trim();
+      return v.replace(/^["']|["']$/g, "");
+    }
+
+    function settings() {
+      return {
+        apexUrl: readCssVar("--yodev-apex-bridge-url"),
+        ref: readCssVar("--yodev-apex-bridge-ref"),
+        enabled: readCssVar("--yodev-apex-bridge-enabled") === "1",
+      };
+    }
+
+    // ─── Who sees this ───────────────────────────────────────────────────
+    //
+    // Anonymous only. A member already knows the product exists; every
+    // impression should reach someone who might not.
+    //
+    // Gated on the PRESENCE of the login control rather than the ABSENCE of
+    // #current-user. Absence is ambiguous during Ember's first paint — the
+    // header may simply not have rendered yet — and that ambiguity would show
+    // the CTA to logged-in members. Requiring a positive anonymous signal fails
+    // the safe way: when unsure, render nothing.
+    function isAnonymous() {
+      return (
+        !!document.querySelector(".login-button, .sign-up-button") &&
+        !document.querySelector("#current-user")
+      );
+    }
+
+    function isTopicPage() {
+      return /^\/t\//.test(window.location.pathname || "");
+    }
+
+    // ─── Copy ────────────────────────────────────────────────────────────
+    //
+    // Varies by category, because a single generic message everywhere earns
+    // banner-blindness fast. Grouped into four buckets rather than one string
+    // per category — 23 categories would be 23 things to keep in sync, and the
+    // meaningful distinction is what the reader came for, not which sub-forum
+    // they landed in.
+    //
+    // Spanish throughout: the audience is decisively Spain, Mexico, Argentina,
+    // Colombia, Chile and Peru.
+    //
+    // ⚠️ Deliberately EVERGREEN — no mention of the 90-day launch offer. The
+    // offer is on the landing page they arrive at, and a component nobody is
+    // going to babysit should not carry a claim that expires. Compare the
+    // splash component, which does carry it and does need maintaining.
+    //
+    // ⚠️ Never say "gratis" about a plan (YOD-495): what is waived is the
+    // subscription, and platform fees on projects still apply.
+    var BUCKETS = {
+      ai: {
+        slugs: [
+          "ai-dev-tools-general", "ai-data-sci", "claude-code", "cursor",
+          "github-copilot", "chatgpt-openai-dev", "gemini-code-assist",
+          "windsurf-codeium", "amazon-q-developer", "aider",
+          "ai-editors-app-builders", "transicion-ai",
+        ],
+        title: "¿Usas IA para programar? Llévala también a tus documentos.",
+        body: "Workplace trae copiloto de IA en todo el editor, y Claude Code puede crear y actualizar tus documentos desde la terminal.",
+        cta: "Conocer Workplace",
+        hash: "#workplace",
+      },
+      career: {
+        slugs: ["trabajos-carrera", "junior-devs"],
+        title: "¿Buscas proyectos freelance?",
+        body: "worX conecta a desarrolladores de Iberoamérica con clientes: alcance acordado antes de empezar, hitos claros y pagos con protección.",
+        cta: "Conocer worX",
+        hash: "#worx",
+      },
+      dev: {
+        slugs: [
+          "desarrollo", "frontend", "backend", "architecture",
+          "cybersecurity", "code-swap",
+        ],
+        title: "Donde tu equipo escribe y piensa",
+        body: "Documentos, canvas y bases de datos en tiempo real — con tus clientes dentro del espacio, en lugar de mandando archivos por correo.",
+        cta: "Conocer Workplace",
+        hash: "#workplace",
+      },
+      // general, daily-tech-feed, how-to-use-the-site, and anything added later.
+      default: {
+        slugs: [],
+        title: "yoDEV es más que la comunidad",
+        body: "Workplace para escribir y pensar en equipo, y worX para trabajo freelance con contratos y pagos claros. Una sola cuenta para las dos.",
+        cta: "Ver la plataforma",
+        hash: "",
+      },
+    };
+
+    // Discourse puts `category-<slug>` on <body> for topic pages, which is the
+    // cheapest reliable read — no DOM walking, no API call, and it is already
+    // there before the topic body finishes rendering.
+    function categorySlug() {
+      var m = /(?:^|\s)category-([a-z0-9_-]+)/i.exec(document.body.className || "");
+      return m ? m[1].toLowerCase() : null;
+    }
+
+    function copyFor(slug) {
+      if (slug) {
+        for (var key in BUCKETS) {
+          if (BUCKETS[key].slugs.indexOf(slug) !== -1) return BUCKETS[key];
+        }
+      }
+      return BUCKETS.default;
+    }
+
+    function buildHref(apexUrl, ref, hash) {
+      var url;
+      try {
+        url = new URL(apexUrl);
+      } catch (err) {
+        console.warn(LOG + "apex_url is not a valid URL; not rendering");
+        return null;
+      }
+      if (url.protocol !== "https:") {
+        console.warn(LOG + "refusing non-https apex_url");
+        return null;
+      }
+      if (ref) url.searchParams.set("ref", ref);
+      // The hash must come after the query string or YOD-478 will not see the
+      // ref — it reads window.location.search.
+      return url.toString() + (hash || "");
+    }
+
+    // ─── Render ──────────────────────────────────────────────────────────
+
+    function remove() {
+      var existing = document.getElementById(NODE_ID);
+      if (existing && existing.parentNode) existing.parentNode.removeChild(existing);
+    }
+
+    function build(copy, href) {
+      var box = document.createElement("aside");
+      box.id = NODE_ID;
+      box.className = "yodev-apex-bridge";
+
+      var h = document.createElement("p");
+      h.className = "yodev-apex-bridge__title";
+      h.textContent = copy.title;
+
+      var p = document.createElement("p");
+      p.className = "yodev-apex-bridge__body";
+      p.textContent = copy.body;
+
+      var a = document.createElement("a");
+      a.className = "yodev-apex-bridge__cta";
+      a.href = href;
+      a.textContent = copy.cta;
+      // No rel=nofollow: this is theme markup, not cooked post content, so
+      // add_rel_nofollow_to_user_content does not apply to it — verified on the
+      // live forum, where the rendered link carries no rel attribute. That is
+      // the difference between a pure referral play and one that also passes
+      // authority to the apex.
+      //
+      // Separately worth doing: `exclude_rel_nofollow_domains` is currently
+      // `www.yodev.dev` only, so links a USER posts to the apex still get
+      // nofollowed. Adding `yodev.dev` fixes that. It does not affect this link.
+      //
+      // Same-tab on purpose. The reader has finished the article; sending them
+      // onward is the goal, and a new tab makes the visit easier to abandon.
+
+      box.appendChild(h);
+      box.appendChild(p);
+      box.appendChild(a);
+      return box;
+    }
+
+    // "Above suggested" — the reader has finished and is deciding what is next,
+    // which is the moment worth spending. `.more-topics__container` is the
+    // suggested/related block on Discourse 2026.8; the footer buttons are the
+    // fallback if that markup changes.
+    function insertionPoint() {
+      var suggested = document.querySelector(".more-topics__container");
+      if (suggested && suggested.parentNode) {
+        return { parent: suggested.parentNode, before: suggested };
+      }
+      var footer = document.getElementById("topic-footer-buttons");
+      if (footer && footer.parentNode) {
+        return { parent: footer.parentNode, before: footer.nextSibling };
+      }
+      return null;
+    }
+
+    var pollTimer = null;
+
+    function stopPolling() {
+      if (pollTimer) {
+        clearInterval(pollTimer);
+        pollTimer = null;
+      }
+    }
+
+    function render() {
+      var s = settings();
+      if (!s.enabled || !s.apexUrl) return;
+      if (!isTopicPage() || !isAnonymous()) return;
+      if (document.getElementById(NODE_ID)) return;
+
+      var point = insertionPoint();
+      if (!point) return; // caller polls; Ember renders the topic asynchronously
+
+      var copy = copyFor(categorySlug());
+      var href = buildHref(s.apexUrl, s.ref, copy.hash);
+      if (!href) return;
+
+      point.parent.insertBefore(build(copy, href), point.before);
+      stopPolling();
+      console.log(LOG + "rendered for category '" + (categorySlug() || "unknown") + "'");
+    }
+
+    // Ember renders the topic after the route resolves, so the insertion point
+    // is not there on the first tick. Poll briefly, then give up rather than
+    // spin forever on a page that will never have one.
+    function renderWhenReady() {
+      stopPolling();
+      render();
+      if (document.getElementById(NODE_ID)) return;
+      var elapsed = 0;
+      pollTimer = setInterval(function () {
+        elapsed += 250;
+        render();
+        if (document.getElementById(NODE_ID) || elapsed >= 10000) stopPolling();
+      }, 250);
+    }
+
+    // ─── SPA navigation ──────────────────────────────────────────────────
+    //
+    // Discourse is an Ember SPA: moving between topics fires no page load, so a
+    // script that runs once at boot renders on the first topic and never again
+    // — and, worse, leaves a stale CTA attached when the reader navigates to a
+    // page that should not have one. This is the YOD-492 lesson, learned on the
+    // beta-offer component.
+    function onRouteChanged() {
+      remove();
+      renderWhenReady();
+    }
+
+    ["pushState", "replaceState"].forEach(function (method) {
+      var original = history[method];
+      history[method] = function () {
+        var result = original.apply(this, arguments);
+        // Let Ember swap the DOM before looking for the insertion point.
+        window.setTimeout(onRouteChanged, 0);
+        return result;
+      };
+    });
+    window.addEventListener("popstate", onRouteChanged);
+
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", renderWhenReady);
+    } else {
+      renderWhenReady();
+    }
+  })();
+</script>

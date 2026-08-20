@@ -1,0 +1,8 @@
+{
+  "name": "yoDEV Apex Bridge",
+  "about_url": "https://github.com/gwillis-inovacon/discourse-yodev-apex-bridge",
+  "license_url": "https://github.com/gwillis-inovacon/discourse-yodev-apex-bridge/blob/main/LICENSE",
+  "component": true,
+  "assets": {},
+  "color_schemes": {}
+}
