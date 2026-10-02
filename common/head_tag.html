@@ -1,6 +1,12 @@
 <script>
   (function () {
-    // yoDEV Apex Bridge — YOD-479.
+    // yoDEV Apex Bridge — YOD-479, reworked in YOD-671.
+    //
+    // YOD-671 (2026-10-02): the CTA now asks for an ACCOUNT, in place, instead
+    // of sending the reader to the homepage. Signups had sat at ~20/month
+    // (~0.2% of pageviews) for four months; a reader who just finished an
+    // article wants more of this, not a product tour. Community value leads,
+    // the product is the second line. A forum signup IS a yoDEV account.
     //
     // ~439 anonymous readers a month reach the community from Google, read an
     // article, and leave without learning the product exists. The apex is
@@ -30,7 +36,8 @@
 
     function settings() {
       return {
-        apexUrl: readCssVar("--yodev-apex-bridge-url"),
+        signupPath: readCssVar("--yodev-apex-bridge-signup"),
+        loginPath: readCssVar("--yodev-apex-bridge-login"),
         ref: readCssVar("--yodev-apex-bridge-ref"),
         enabled: readCssVar("--yodev-apex-bridge-enabled") === "1",
       };
@@ -68,13 +75,14 @@
     // Spanish throughout: the audience is decisively Spain, Mexico, Argentina,
     // Colombia, Chile and Peru.
     //
-    // ⚠️ Deliberately EVERGREEN — no mention of the 90-day launch offer. The
-    // offer is on the landing page they arrive at, and a component nobody is
-    // going to babysit should not carry a claim that expires. Compare the
-    // splash component, which does carry it and does need maintaining.
+    // ⚠️ Deliberately EVERGREEN: no offers, no dates. A component nobody is
+    // going to babysit should not carry a claim that expires.
     //
-    // ⚠️ Never say "gratis" about a plan (YOD-495): what is waived is the
-    // subscription, and platform fees on projects still apply.
+    // "Cuenta gratuita" is accurate under the single free plan (2026-09-23):
+    // the account and both apps are free; worX fees apply only to contracts.
+    // Neutral Spanish, tú, never voseo.
+    var CTA = "Crear cuenta gratis";
+    var SECONDARY = "Ya tengo cuenta";
     var BUCKETS = {
       ai: {
         slugs: [
@@ -83,35 +91,27 @@
           "windsurf-codeium", "amazon-q-developer", "aider",
           "ai-editors-app-builders", "transicion-ai",
         ],
-        title: "¿Usas IA para programar? Llévala también a tus documentos.",
-        body: "Workplace trae copiloto de IA en todo el editor, y Claude Code puede crear y actualizar tus documentos desde la terminal.",
-        cta: "Conocer Workplace",
-        hash: "#workplace",
+        title: "¿Te sirvió? Recibe cada semana lo mejor en IA para programar.",
+        body: "Con tu cuenta gratuita de yoDEV votas en las encuestas, preguntas a otros devs y recibes un resumen semanal con las herramientas que vale la pena probar. Incluye tu propio workspace en yoDEV Workplace, que Claude Code puede leer y actualizar desde la terminal.",
       },
       career: {
         slugs: ["trabajos-carrera", "junior-devs"],
-        title: "¿Buscas proyectos freelance?",
-        body: "worX conecta a desarrolladores de Iberoamérica con clientes: alcance acordado antes de empezar, hitos claros y pagos con protección.",
-        cta: "Conocer worX",
-        hash: "#worx",
+        title: "Únete a los devs de Iberoamérica que trabajan con estructura.",
+        body: "Con tu cuenta gratuita de yoDEV participas en la comunidad, recibes un resumen semanal y accedes a yoDEV worX: proyectos freelance con alcance acordado, hitos con presupuesto y pago tras la aprobación.",
       },
       dev: {
         slugs: [
           "desarrollo", "frontend", "backend", "architecture",
           "cybersecurity", "code-swap",
         ],
-        title: "Donde tu equipo escribe y piensa",
-        body: "Documentos, canvas y bases de datos en tiempo real — con tus clientes dentro del espacio, en lugar de mandando archivos por correo.",
-        cta: "Conocer Workplace",
-        hash: "#workplace",
+        title: "¿Te sirvió? Sigue la conversación con otros devs.",
+        body: "Con tu cuenta gratuita de yoDEV votas en las encuestas, preguntas y respondes, y recibes un resumen semanal. Incluye tu propio workspace en yoDEV Workplace: documentos, canvas y bases de datos en tiempo real.",
       },
       // general, daily-tech-feed, how-to-use-the-site, and anything added later.
       default: {
         slugs: [],
-        title: "yoDEV es más que la comunidad",
-        body: "Workplace para escribir y pensar en equipo, y worX para trabajo freelance con contratos y pagos claros. Una sola cuenta para las dos.",
-        cta: "Ver la plataforma",
-        hash: "",
+        title: "Únete a yoDEV, la comunidad de devs de Iberoamérica.",
+        body: "Con tu cuenta gratuita votas en las encuestas, preguntas a otros devs y recibes cada semana un resumen con lo mejor de la comunidad. La misma cuenta te da acceso a yoDEV Workplace y yoDEV worX.",
       },
     };
 
@@ -123,31 +123,39 @@
       return m ? m[1].toLowerCase() : null;
     }
 
-    function copyFor(slug) {
+    function bucketFor(slug) {
       if (slug) {
         for (var key in BUCKETS) {
-          if (BUCKETS[key].slugs.indexOf(slug) !== -1) return BUCKETS[key];
+          if (BUCKETS[key].slugs.indexOf(slug) !== -1) return key;
         }
       }
-      return BUCKETS.default;
+      return "default";
     }
 
-    function buildHref(apexUrl, ref, hash) {
-      var url;
+    // Same-origin paths only. Anything else (a full URL, a protocol-relative
+    // "//host") is refused, so a mistyped setting can never point the CTA
+    // off-site.
+    function safePath(path) {
+      if (!path || path.charAt(0) !== "/" || path.charAt(1) === "/") {
+        console.warn(LOG + "path setting must start with a single '/'; not rendering");
+        return null;
+      }
+      return path;
+    }
+
+    // Discourse drops ?ref= on the way through signup, so the click is the
+    // attribution signal. Requires a "CTA Click" custom-event goal in
+    // Plausible; without it the event is sent but not shown.
+    function trackClick(ref, bucket, target) {
       try {
-        url = new URL(apexUrl);
+        if (typeof window.plausible === "function") {
+          window.plausible("CTA Click", {
+            props: { placement: ref || "unknown", bucket: bucket, target: target },
+          });
+        }
       } catch (err) {
-        console.warn(LOG + "apex_url is not a valid URL; not rendering");
-        return null;
+        // Tracking must never block the navigation.
       }
-      if (url.protocol !== "https:") {
-        console.warn(LOG + "refusing non-https apex_url");
-        return null;
-      }
-      if (ref) url.searchParams.set("ref", ref);
-      // The hash must come after the query string or YOD-478 will not see the
-      // ref — it reads window.location.search.
-      return url.toString() + (hash || "");
     }
 
     // ─── Render ──────────────────────────────────────────────────────────
@@ -157,7 +165,7 @@
       if (existing && existing.parentNode) existing.parentNode.removeChild(existing);
     }
 
-    function build(copy, href) {
+    function build(copy, bucket, signupHref, loginHref, ref) {
       var box = document.createElement("aside");
       box.id = NODE_ID;
       box.className = "yodev-apex-bridge";
@@ -170,26 +178,26 @@
       p.className = "yodev-apex-bridge__body";
       p.textContent = copy.body;
 
+      // Same-tab on purpose: signup happens on this forum, and the reader
+      // comes back to the article they were on.
       var a = document.createElement("a");
       a.className = "yodev-apex-bridge__cta";
-      a.href = href;
-      a.textContent = copy.cta;
-      // No rel=nofollow: this is theme markup, not cooked post content, so
-      // add_rel_nofollow_to_user_content does not apply to it — verified on the
-      // live forum, where the rendered link carries no rel attribute. That is
-      // the difference between a pure referral play and one that also passes
-      // authority to the apex.
-      //
-      // Separately worth doing: `exclude_rel_nofollow_domains` is currently
-      // `www.yodev.dev` only, so links a USER posts to the apex still get
-      // nofollowed. Adding `yodev.dev` fixes that. It does not affect this link.
-      //
-      // Same-tab on purpose. The reader has finished the article; sending them
-      // onward is the goal, and a new tab makes the visit easier to abandon.
+      a.href = signupHref;
+      a.textContent = CTA;
+      a.addEventListener("click", function () { trackClick(ref, bucket, "signup"); });
 
       box.appendChild(h);
       box.appendChild(p);
       box.appendChild(a);
+
+      if (loginHref) {
+        var l = document.createElement("a");
+        l.className = "yodev-apex-bridge__secondary";
+        l.href = loginHref;
+        l.textContent = SECONDARY;
+        l.addEventListener("click", function () { trackClick(ref, bucket, "login"); });
+        box.appendChild(l);
+      }
       return box;
     }
 
@@ -220,18 +228,22 @@
 
     function render() {
       var s = settings();
-      if (!s.enabled || !s.apexUrl) return;
+      if (!s.enabled || !s.signupPath) return;
       if (!isTopicPage() || !isAnonymous()) return;
       if (document.getElementById(NODE_ID)) return;
 
       var point = insertionPoint();
       if (!point) return; // caller polls; Ember renders the topic asynchronously
 
-      var copy = copyFor(categorySlug());
-      var href = buildHref(s.apexUrl, s.ref, copy.hash);
-      if (!href) return;
+      var bucket = bucketFor(categorySlug());
+      var signupHref = safePath(s.signupPath);
+      if (!signupHref) return;
+      var loginHref = s.loginPath ? safePath(s.loginPath) : null;
 
-      point.parent.insertBefore(build(copy, href), point.before);
+      point.parent.insertBefore(
+        build(BUCKETS[bucket], bucket, signupHref, loginHref, s.ref),
+        point.before
+      );
       stopPolling();
       console.log(LOG + "rendered for category '" + (categorySlug() || "unknown") + "'");
     }

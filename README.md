@@ -1,5 +1,7 @@
 # yoDEV Apex Bridge
 
+> **v2 — YOD-671 (2026-10-02): signup-first.** The CTA no longer links to the homepage. It asks anonymous readers who finished an article to **create an account in place** (Discourse `/signup`, which is a yoDEV account), with a secondary "Ya tengo cuenta" link. Copy leads with community value (polls, asking other devs, weekly digest) and names the product second, per category bucket. Discourse drops `?ref=` through signup, so attribution is a Plausible custom event **`CTA Click`** (props `placement`, `bucket`, `target`) plus Discourse's own signup counts — add `CTA Click` as a goal in Plausible. Settings: `signup_path`, `login_path` (same-origin paths only; anything else is refused), `ref_value`, `enabled`. Signups had held at ~20/month (~0.2% of pageviews) for four months while v1 was never installed. The sections below describe v1 and remain accurate for gating, placement and SPA handling.
+
 A Discourse theme component that shows **anonymous** readers a contextual link to the yoDEV homepage at the end of a topic.
 
 ## Why (YOD-479)

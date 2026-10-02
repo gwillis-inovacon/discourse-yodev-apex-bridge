@@ -1,14 +1,20 @@
-apex_url:
+signup_path:
   type: string
-  default: "https://yodev.dev"
+  default: "/signup"
   description:
-    en: "The yoDEV homepage (apex) this CTA links to. NOT the community host. Blank disables the component entirely."
+    en: "Forum path the primary CTA opens (Discourse's own signup). Must start with '/'. Blank disables the component entirely. YOD-671: signup happens in place on the forum, which creates the same yoDEV account as the homepage."
+
+login_path:
+  type: string
+  default: "/login"
+  description:
+    en: "Forum path for the secondary 'Ya tengo cuenta' link. Must start with '/'."
 
 ref_value:
   type: string
   default: "comm-topic-end"
   description:
-    en: "Value of the ?ref= parameter appended to every link. YOD-478 captures this on landing and merges it into every GA event, so signups are attributable to this placement rather than just clicks. Change it only if you want a placement to be reported separately."
+    en: "Placement name sent as the `placement` prop of the Plausible 'CTA Click' event. Discourse does not keep ?ref= through signup, so attribution is the click event plus Discourse's own signup counts."
 
 enabled:
   type: bool

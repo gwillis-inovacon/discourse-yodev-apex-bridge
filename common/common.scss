@@ -3,7 +3,8 @@
 // does not, and `<script type="text/discourse-plugin">` does not execute on
 // this setup. Same bridge the other yoDEV components use.
 :root {
-  --yodev-apex-bridge-url: "#{$apex_url}";
+  --yodev-apex-bridge-signup: "#{$signup_path}";
+  --yodev-apex-bridge-login: "#{$login_path}";
   --yodev-apex-bridge-ref: "#{$ref_value}";
   --yodev-apex-bridge-enabled: #{if($enabled, 1, 0)};
 }
@@ -67,6 +68,18 @@
       outline-offset: 2px;
     }
   }
+
+  &__secondary {
+    display: inline-block;
+    margin-left: 1em;
+    color: var(--primary-medium);
+    font-size: 0.95em;
+
+    &:hover,
+    &:focus {
+      color: var(--primary);
+    }
+  }
 }
 
 // The topic list below is dense; on narrow screens the CTA needs room to
@@ -78,6 +91,12 @@
 
     &__cta {
       display: block;
+      text-align: center;
+    }
+
+    &__secondary {
+      display: block;
+      margin: 0.75em 0 0;
       text-align: center;
     }
   }

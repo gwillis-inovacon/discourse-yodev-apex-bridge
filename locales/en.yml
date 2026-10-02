@@ -1,7 +1,8 @@
 en:
   theme_metadata:
-    description: "Shows anonymous readers a contextual link to the yoDEV homepage at the end of a topic, so search traffic that lands on the community discovers the product."
+    description: "Shows anonymous readers a signup CTA at the end of a topic (community value first, product second), so search readers who finish an article are invited to join."
     settings:
-      apex_url: "The yoDEV homepage this CTA links to. Blank disables the component."
-      ref_value: "Value of the ?ref= parameter, used for attribution."
+      signup_path: "Forum path for the signup CTA. Blank disables the component."
+      login_path: "Forum path for the 'Ya tengo cuenta' link."
+      ref_value: "Placement name for the Plausible 'CTA Click' event."
       enabled: "Render the CTA."
