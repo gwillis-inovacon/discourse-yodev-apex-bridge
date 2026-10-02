@@ -9,137 +9,194 @@
   --yodev-apex-bridge-enabled: #{if($enabled, 1, 0)};
 }
 
-// Styled from Discourse's own theme variables rather than yoDEV brand colours.
-// A block that ignores the forum's palette reads as an ad and gets skipped;
-// one that belongs to the page gets read. It also means this survives a theme
-// or colour-scheme change without edits, including dark mode.
+// YOD-671: identical visual language to the two forum banners — the beta-offer
+// banner (discourse-yodev-beta-offer, .yodev-beta-banner) and the Decisions
+// banner (discourse-affine-sidebar, .yodev-decisions-banner). Values are copied
+// from those components; keep them in step if their palette changes. Geist and
+// Inter are loaded by the beta-offer component; the stacks fall back cleanly.
+$yab-font-display: "Geist", "Inter", -apple-system, "Segoe UI", Roboto, sans-serif;
+$yab-font-body: "Inter", -apple-system, "Segoe UI", Roboto, sans-serif;
+$yab-primary: #c3c0ff;
+$yab-primary-ink: #1d00a5;
+
 .yodev-apex-bridge {
+  container-type: inline-size; // reflow on the card's OWN width
+  position: relative;
+  overflow: hidden;
   display: block;
-  // So the max-width set by alignToPost() includes padding and border.
-  box-sizing: border-box;
-  margin: 1.5em 0;
-  padding: 1.25em 1.5em;
-  border: 1px solid var(--primary-low);
-  border-left: 3px solid var(--tertiary);
-  border-radius: 4px;
-  background: var(--primary-very-low);
+  box-sizing: border-box; // so the max-width set by alignToPost() includes padding + border
+  margin: 24px 0;
+  padding: 24px;
+  border: 1px solid #464555;
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(28, 43, 60, 0.82) 0%, rgba(13, 28, 45, 0.9) 100%);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 10px 30px -12px rgba(0, 0, 0, 0.6);
+  color: #d4e4fa;
+  font-family: $yab-font-body;
+
+  // Atmospheric glow, top-right (as on both banners).
+  &::before {
+    content: "";
+    position: absolute;
+    top: -96px;
+    right: -96px;
+    width: 192px;
+    height: 192px;
+    border-radius: 9999px;
+    background: $yab-primary;
+    opacity: 0.1;
+    filter: blur(80px);
+    pointer-events: none;
+  }
+
+  &__content {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  &__eyebrow {
+    margin: 0;
+    font-family: $yab-font-display !important;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: $yab-primary;
+  }
 
   &__title {
-    margin: 0 0 0.4em;
+    // !important: a theme heading/paragraph rule washed the banners' headline
+    // to muted/uppercase; same defence here.
+    margin: 0;
+    font-family: $yab-font-display !important;
+    font-size: 24px;
     font-weight: 700;
-    color: var(--primary);
-    line-height: 1.3;
+    line-height: 1.2;
+    letter-spacing: -0.01em;
+    text-transform: none !important;
+    color: #fff !important;
   }
 
   &__body {
-    margin: 0 0 1em;
-    color: var(--primary-medium);
-    font-size: 0.95em;
-    line-height: 1.5;
+    margin: 0;
+    max-width: 52em;
+    font-size: 15px;
+    line-height: 1.6;
+    color: #c7c4d8;
   }
 
+  &__actions {
+    margin: 10px 0 0;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  // Colours carry !important on EVERY state: core Discourse styles
+  // `a, a:visited, a:hover, a:active` with var(--d-link-color), and a:visited
+  // outranks a class — that is what made the v2 button text vanish after a
+  // reader had clicked through to /signup. The banners use the same defence.
   &__cta {
-    display: inline-block;
-    padding: 0.6em 1.2em;
-    border-radius: 4px;
-    background: var(--tertiary);
-    // White rather than var(--secondary). Discourse's own button pattern is
-    // tertiary-on-secondary, but measured against the live forum theme that
-    // gives 4.24:1 at 16px/600 — under the 4.5:1 AA threshold, and 16px
-    // semi-bold does not qualify as large text. White on the same accent
-    // measures 4.70:1 and passes. It is also the treatment the brand uses for
-    // this colour.
-    //
-    // ⚠️ Measured against the CURRENT (dark) forum theme. On a light theme with
-    // a paler --tertiary, white could fall below the threshold — re-measure if
-    // the colour scheme changes.
-    color: #fff;
-    font-weight: 600;
-    text-decoration: none;
+    box-sizing: border-box;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 13px 26px;
+    border: none;
+    border-radius: 9px;
+    background: linear-gradient(180deg, #c3c0ff 0%, #a3a0e6 100%);
+    color: $yab-primary-ink !important;
+    font-family: $yab-font-display !important;
+    font-size: 15px;
+    font-weight: 700;
+    text-decoration: none !important;
+    white-space: nowrap;
+    cursor: pointer;
+    box-shadow: 0 0 0 1px rgba(195, 192, 255, 0.4), 0 8px 24px -8px rgba(163, 160, 230, 0.75);
+    transition: filter 0.15s ease, transform 0.05s ease;
+
+    &:link,
+    &:visited {
+      color: $yab-primary-ink !important;
+    }
 
     &:hover,
     &:focus {
-      background: var(--tertiary-hover, var(--tertiary));
-      color: #fff;
-      text-decoration: none;
+      filter: brightness(1.06);
+      color: $yab-primary-ink !important;
     }
 
-    // Discourse's own focus treatment is easy to lose on a custom control.
     &:focus-visible {
-      outline: 2px solid var(--tertiary);
+      outline: 2px solid $yab-primary;
+      outline-offset: 3px;
+    }
+
+    &:active {
+      transform: scale(0.97);
+    }
+  }
+
+  &__arrow {
+    font-size: 17px;
+    line-height: 1;
+  }
+
+  // Secondary — the banners' quiet ghost ("glass") button.
+  &__secondary {
+    box-sizing: border-box;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 13px 20px;
+    border: 1px solid rgba(195, 192, 255, 0.35);
+    border-radius: 9px;
+    background: transparent;
+    color: $yab-primary !important;
+    font-family: $yab-font-display !important;
+    font-size: 15px;
+    font-weight: 600;
+    text-decoration: none !important;
+    white-space: nowrap;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
+
+    &:link,
+    &:visited {
+      color: $yab-primary !important;
+    }
+
+    &:hover,
+    &:focus {
+      background: rgba(195, 192, 255, 0.08);
+      border-color: rgba(195, 192, 255, 0.55);
+      color: #d4d2ff !important;
+    }
+
+    &:focus-visible {
+      outline: 2px solid $yab-primary;
       outline-offset: 2px;
     }
   }
 
-  &__secondary {
-    display: inline-block;
-    margin-left: 1em;
-    color: var(--primary-medium);
-    font-size: 0.95em;
-
-    &:hover,
-    &:focus {
-      color: var(--primary);
-    }
-  }
-}
-
-// The topic list below is dense; on narrow screens the CTA needs room to
-// breathe or it reads as part of the first suggested topic.
-@media (max-width: 600px) {
-  .yodev-apex-bridge {
-    padding: 1em;
-    margin: 1.25em 0;
-
-    &__cta {
-      display: block;
-      text-align: center;
+  // Narrow column → full-width buttons, smaller headline (as on both banners).
+  @container (max-width: 520px) {
+    &__title {
+      font-size: 20px;
     }
 
+    &__actions {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    &__cta,
     &__secondary {
-      display: block;
-      margin: 0.75em 0 0;
-      text-align: center;
-    }
-  }
-}
-
-
-// YOD-671 fix: core Discourse styles `a, a:visited, a:hover, a:active` with
-// var(--d-link-color). `a:visited` (0,1,1) outranks a single class (0,1,0),
-// so once a reader had clicked through to /signup the button text took the
-// link colour — the same blue as the button — and only reappeared on :hover.
-// Pin every link state with an id-scoped selector that outranks core.
-#yodev-apex-bridge {
-  a.yodev-apex-bridge__cta {
-    &,
-    &:link,
-    &:visited,
-    &:active {
-      color: #fff;
-      background: var(--tertiary);
-      text-decoration: none;
-    }
-
-    &:hover,
-    &:focus {
-      color: #fff;
-      background: var(--tertiary-hover, var(--tertiary));
-      text-decoration: none;
-    }
-  }
-
-  a.yodev-apex-bridge__secondary {
-    &,
-    &:link,
-    &:visited,
-    &:active {
-      color: var(--primary-medium);
-    }
-
-    &:hover,
-    &:focus {
-      color: var(--primary);
+      width: 100%;
     }
   }
 }

@@ -81,6 +81,7 @@
     // "Cuenta gratuita" is accurate under the single free plan (2026-09-23):
     // the account and both apps are free; worX fees apply only to contracts.
     // Neutral Spanish, tú, never voseo.
+    var EYEBROW = "Gratis para devs";
     var CTA = "Crear cuenta gratis";
     var SECONDARY = "Ya tengo cuenta";
     var BUCKETS = {
@@ -165,30 +166,46 @@
       if (existing && existing.parentNode) existing.parentNode.removeChild(existing);
     }
 
+    // Markup mirrors the forum banners (eyebrow / title / body / actions) so
+    // the shared visual language in common.scss applies one-to-one.
     function build(copy, bucket, signupHref, loginHref, ref) {
       var box = document.createElement("aside");
       box.id = NODE_ID;
       box.className = "yodev-apex-bridge";
 
+      var content = document.createElement("div");
+      content.className = "yodev-apex-bridge__content";
+
+      var eyebrow = document.createElement("p");
+      eyebrow.className = "yodev-apex-bridge__eyebrow";
+      eyebrow.textContent = EYEBROW;
+
       var h = document.createElement("p");
       h.className = "yodev-apex-bridge__title";
+      h.setAttribute("role", "heading");
+      h.setAttribute("aria-level", "2");
       h.textContent = copy.title;
 
       var p = document.createElement("p");
       p.className = "yodev-apex-bridge__body";
       p.textContent = copy.body;
 
+      var actions = document.createElement("div");
+      actions.className = "yodev-apex-bridge__actions";
+
       // Same-tab on purpose: signup happens on this forum, and the reader
       // comes back to the article they were on.
       var a = document.createElement("a");
       a.className = "yodev-apex-bridge__cta";
       a.href = signupHref;
-      a.textContent = CTA;
+      a.appendChild(document.createTextNode(CTA + " "));
+      var arrow = document.createElement("span");
+      arrow.className = "yodev-apex-bridge__arrow";
+      arrow.setAttribute("aria-hidden", "true");
+      arrow.textContent = "\u2192";
+      a.appendChild(arrow);
       a.addEventListener("click", function () { trackClick(ref, bucket, "signup"); });
-
-      box.appendChild(h);
-      box.appendChild(p);
-      box.appendChild(a);
+      actions.appendChild(a);
 
       if (loginHref) {
         var l = document.createElement("a");
@@ -196,8 +213,14 @@
         l.href = loginHref;
         l.textContent = SECONDARY;
         l.addEventListener("click", function () { trackClick(ref, bucket, "login"); });
-        box.appendChild(l);
+        actions.appendChild(l);
       }
+
+      content.appendChild(eyebrow);
+      content.appendChild(h);
+      content.appendChild(p);
+      content.appendChild(actions);
+      box.appendChild(content);
       return box;
     }
 
@@ -218,13 +241,14 @@
     }
 
     // The insertion point sits in the wide container that also holds the
-    // suggested topics (1104px on a 1440 desktop), but the article text
-    // column is narrower and indented (865px). Line the box up with the post
-    // body, measured live, so it reads as the end of the article rather than
-    // a banner. Falls back to the container width if the post is missing.
+    // suggested topics (1104px on a 1440 desktop). Line the box up with the
+    // topic column — the title card and posts card (976px at x=304) —
+    // measured live: the same rule the forum banners use, so every card on a
+    // topic page shares one left and right edge.
     function alignToPost() {
       var box = document.getElementById(NODE_ID);
-      var ref = document.querySelector(".topic-post .topic-body");
+      var ref = document.querySelector("#topic-title") ||
+        document.querySelector(".posts-wrapper");
       if (!box || !ref || !box.parentNode) return;
       box.style.marginLeft = "";
       box.style.maxWidth = "";
