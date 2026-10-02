@@ -217,6 +217,31 @@
       return null;
     }
 
+    // The insertion point sits in the wide container that also holds the
+    // suggested topics (1104px on a 1440 desktop), but the article text
+    // column is narrower and indented (865px). Line the box up with the post
+    // body, measured live, so it reads as the end of the article rather than
+    // a banner. Falls back to the container width if the post is missing.
+    function alignToPost() {
+      var box = document.getElementById(NODE_ID);
+      var ref = document.querySelector(".topic-post .topic-body");
+      if (!box || !ref || !box.parentNode) return;
+      box.style.marginLeft = "";
+      box.style.maxWidth = "";
+      var parent = box.parentNode.getBoundingClientRect();
+      var post = ref.getBoundingClientRect();
+      var offset = Math.round(post.left - parent.left);
+      if (post.width <= 0 || offset < 0 || post.width > parent.width) return;
+      box.style.marginLeft = offset + "px";
+      box.style.maxWidth = Math.round(post.width) + "px";
+    }
+
+    var resizeTimer = null;
+    window.addEventListener("resize", function () {
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(alignToPost, 150);
+    });
+
     var pollTimer = null;
 
     function stopPolling() {
@@ -244,6 +269,7 @@
         build(BUCKETS[bucket], bucket, signupHref, loginHref, s.ref),
         point.before
       );
+      alignToPost();
       stopPolling();
       console.log(LOG + "rendered for category '" + (categorySlug() || "unknown") + "'");
     }

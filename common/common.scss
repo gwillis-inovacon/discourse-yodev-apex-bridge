@@ -15,6 +15,8 @@
 // or colour-scheme change without edits, including dark mode.
 .yodev-apex-bridge {
   display: block;
+  // So the max-width set by alignToPost() includes padding and border.
+  box-sizing: border-box;
   margin: 1.5em 0;
   padding: 1.25em 1.5em;
   border: 1px solid var(--primary-low);
@@ -98,6 +100,46 @@
       display: block;
       margin: 0.75em 0 0;
       text-align: center;
+    }
+  }
+}
+
+
+// YOD-671 fix: core Discourse styles `a, a:visited, a:hover, a:active` with
+// var(--d-link-color). `a:visited` (0,1,1) outranks a single class (0,1,0),
+// so once a reader had clicked through to /signup the button text took the
+// link colour — the same blue as the button — and only reappeared on :hover.
+// Pin every link state with an id-scoped selector that outranks core.
+#yodev-apex-bridge {
+  a.yodev-apex-bridge__cta {
+    &,
+    &:link,
+    &:visited,
+    &:active {
+      color: #fff;
+      background: var(--tertiary);
+      text-decoration: none;
+    }
+
+    &:hover,
+    &:focus {
+      color: #fff;
+      background: var(--tertiary-hover, var(--tertiary));
+      text-decoration: none;
+    }
+  }
+
+  a.yodev-apex-bridge__secondary {
+    &,
+    &:link,
+    &:visited,
+    &:active {
+      color: var(--primary-medium);
+    }
+
+    &:hover,
+    &:focus {
+      color: var(--primary);
     }
   }
 }
