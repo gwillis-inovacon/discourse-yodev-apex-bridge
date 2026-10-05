@@ -84,6 +84,23 @@
     var EYEBROW = "Gratis para devs";
     var CTA = "Crear cuenta gratis";
     var SECONDARY = "Ya tengo cuenta";
+    // YOD-688: the box lists what the free account actually includes, as one
+    // inline row (wraps on mobile, never stacked). "Incluye tu propio
+    // workspace" read as ONE workspace; the free plan has no workspace cap.
+    // Facts, verified 2026-10-05 — re-check before editing:
+    //   · 10 members/workspace = Workplace features.free_plan_v1.memberLimit
+    //   · no workspace-count check in createWorkspace; homepage pricing says
+    //     "ilimitados"
+    //   · Copilot: free plan has 20 actions + paid credits, so never "ilimitado"
+    //   · the four integrations are documented in "Comenzando" (YOD-687)
+    var WP_LEAD = { pre: "Y tienes ", strong: "yoDEV Workplace", post: " incluido:" };
+    var WP_PERKS = [
+      "Workspaces ilimitados",
+      "Hasta 10 miembros por workspace",
+      "Copiloto de IA (Claude)",
+      "Claude Code, Linear, GitHub y Gmail integrados",
+      "Docs, canvas y bases de datos en tiempo real",
+    ];
     var BUCKETS = {
       ai: {
         slugs: [
@@ -93,12 +110,21 @@
           "ai-editors-app-builders", "transicion-ai",
         ],
         title: "¿Te sirvió? Recibe cada semana lo mejor en IA para programar.",
-        body: "Con tu cuenta gratuita de yoDEV votas en las encuestas, preguntas a otros devs y recibes un resumen semanal con las herramientas que vale la pena probar. Incluye tu propio workspace en yoDEV Workplace, que Claude Code puede leer y actualizar desde la terminal.",
+        body: "Con tu cuenta gratuita de yoDEV votas en las encuestas, preguntas a otros devs y recibes un resumen semanal.",
+        lead: WP_LEAD,
+        perks: WP_PERKS,
       },
       career: {
         slugs: ["trabajos-carrera", "junior-devs"],
         title: "Únete a los devs de Iberoamérica que trabajan con estructura.",
-        body: "Con tu cuenta gratuita de yoDEV participas en la comunidad, recibes un resumen semanal y accedes a yoDEV worX: proyectos freelance con alcance acordado, hitos con presupuesto y pago tras la aprobación.",
+        body: "Con tu cuenta gratuita de yoDEV participas en la comunidad y recibes un resumen semanal.",
+        lead: { pre: "Y accedes a ", strong: "yoDEV worX y Workplace", post: ":" },
+        perks: [
+          "Proyectos con alcance acordado",
+          "Hitos con presupuesto",
+          "Conservas el 96 %",
+          "Workspaces ilimitados para tus clientes",
+        ],
       },
       dev: {
         slugs: [
@@ -106,15 +132,27 @@
           "cybersecurity", "code-swap",
         ],
         title: "¿Te sirvió? Sigue la conversación con otros devs.",
-        body: "Con tu cuenta gratuita de yoDEV votas en las encuestas, preguntas y respondes, y recibes un resumen semanal. Incluye tu propio workspace en yoDEV Workplace: documentos, canvas y bases de datos en tiempo real.",
+        body: "Con tu cuenta gratuita de yoDEV votas en las encuestas, preguntas y respondes, y recibes un resumen semanal.",
+        lead: WP_LEAD,
+        perks: WP_PERKS,
       },
       // general, daily-tech-feed, how-to-use-the-site, and anything added later.
       default: {
         slugs: [],
         title: "Únete a yoDEV, la comunidad de devs de Iberoamérica.",
-        body: "Con tu cuenta gratuita votas en las encuestas, preguntas a otros devs y recibes cada semana un resumen con lo mejor de la comunidad. La misma cuenta te da acceso a yoDEV Workplace y yoDEV worX.",
+        body: "Con tu cuenta gratuita de yoDEV votas en las encuestas, preguntas y respondes, y recibes un resumen semanal.",
+        lead: WP_LEAD,
+        perks: WP_PERKS,
       },
     };
+
+    // YOD-688: one quiet line mid-article for readers who never reach the end.
+    var MID = {
+      text: "Gratis para devs: resumen semanal de herramientas, encuestas y workspaces ilimitados en yoDEV Workplace.",
+      link: "Crear cuenta",
+    };
+    var MID_ID = "yodev-apex-mid";
+    var MID_MIN_PARAGRAPHS = 6;
 
     // Discourse puts `category-<slug>` on <body> for topic pages, which is the
     // cheapest reliable read — no DOM walking, no API call, and it is already
@@ -162,8 +200,10 @@
     // ─── Render ──────────────────────────────────────────────────────────
 
     function remove() {
-      var existing = document.getElementById(NODE_ID);
-      if (existing && existing.parentNode) existing.parentNode.removeChild(existing);
+      [NODE_ID, MID_ID].forEach(function (id) {
+        var existing = document.getElementById(id);
+        if (existing && existing.parentNode) existing.parentNode.removeChild(existing);
+      });
     }
 
     // Markup mirrors the forum banners (eyebrow / title / body / actions) so
@@ -189,6 +229,24 @@
       var p = document.createElement("p");
       p.className = "yodev-apex-bridge__body";
       p.textContent = copy.body;
+      if (copy.lead) {
+        p.appendChild(document.createTextNode(" " + copy.lead.pre));
+        var strong = document.createElement("strong");
+        strong.textContent = copy.lead.strong;
+        p.appendChild(strong);
+        p.appendChild(document.createTextNode(copy.lead.post));
+      }
+
+      var perks = null;
+      if (copy.perks && copy.perks.length) {
+        perks = document.createElement("ul");
+        perks.className = "yodev-apex-bridge__perks";
+        copy.perks.forEach(function (text) {
+          var li = document.createElement("li");
+          li.textContent = text;
+          perks.appendChild(li);
+        });
+      }
 
       var actions = document.createElement("div");
       actions.className = "yodev-apex-bridge__actions";
@@ -219,9 +277,102 @@
       content.appendChild(eyebrow);
       content.appendChild(h);
       content.appendChild(p);
+      if (perks) content.appendChild(perks);
       content.appendChild(actions);
       box.appendChild(content);
       return box;
+    }
+
+    // ─── Mid-article line (YOD-688) ──────────────────────────────────────
+    //
+    // A pageview is not a read: many readers never reach the end box. One
+    // muted line between two TOP-LEVEL paragraphs about halfway through the
+    // first post. Rules, so it never feels like an ad break:
+    //   · direct children of .cooked only — never inside a list, quote, code
+    //     block, poll or onebox;
+    //   · both neighbours must be prose (p / h2–h4), so it never sits against
+    //     a code sample, image or poll;
+    //   · skipped below MID_MIN_PARAGRAPHS, where it would crowd the end box.
+    function firstPostCooked() {
+      return document.querySelector("#post_1 .cooked") ||
+        document.querySelector('.topic-post[data-post-number="1"] .cooked');
+    }
+
+    function isProse(el) {
+      return !!el && /^(P|H2|H3|H4)$/.test(el.tagName) &&
+        !el.querySelector("img, iframe, video, .onebox, .poll, pre");
+    }
+
+    function midAnchor(cooked) {
+      var kids = Array.prototype.slice.call(cooked.children);
+      var paras = kids.filter(function (el) {
+        return el.tagName === "P" && isProse(el) && (el.textContent || "").trim().length >= 40;
+      });
+      if (paras.length < MID_MIN_PARAGRAPHS) return null;
+      // Start at the middle paragraph and walk forward to the first slot whose
+      // neighbours are both prose; never past the last third.
+      var start = kids.indexOf(paras[Math.floor(paras.length / 2) - 1]);
+      var stop = kids.indexOf(paras[Math.floor((paras.length * 2) / 3)]);
+      for (var i = start; i >= 0 && i <= stop && i < kids.length - 1; i++) {
+        if (kids[i].tagName === "P" && isProse(kids[i]) && isProse(kids[i + 1])) return kids[i];
+      }
+      return null;
+    }
+
+    function buildMid(signupHref, bucket) {
+      var aside = document.createElement("aside");
+      aside.id = MID_ID;
+      aside.className = "yodev-apex-mid";
+      aside.setAttribute("aria-label", EYEBROW);
+      var icon = document.createElement("span");
+      icon.className = "yodev-apex-mid__icon";
+      icon.setAttribute("aria-hidden", "true");
+      icon.textContent = "\uD83D\uDCA1";
+      aside.appendChild(icon);
+      aside.appendChild(document.createTextNode(MID.text + " "));
+      var a = document.createElement("a");
+      a.className = "yodev-apex-mid__link";
+      a.href = signupHref;
+      a.textContent = MID.link + " \u2192";
+      a.addEventListener("click", function () { trackClick("comm-topic-mid", bucket, "signup"); });
+      aside.appendChild(a);
+      return aside;
+    }
+
+    // Returns true once the mid line is placed OR there is nowhere to place it
+    // (short article), so the caller can stop polling.
+    function renderMid(signupHref, bucket) {
+      if (document.getElementById(MID_ID)) return true;
+      var cooked = firstPostCooked();
+      if (!cooked || !cooked.children.length) return false; // not rendered yet
+      var anchor = midAnchor(cooked);
+      if (!anchor) return true;
+      anchor.parentNode.insertBefore(buildMid(signupHref, bucket), anchor.nextSibling);
+      midWanted = true;
+      return true;
+    }
+
+    // Discourse "cloaks" posts that scroll far off-screen and re-renders them
+    // when they come back (measured 2026-10-05: removal via
+    // .post-stream--cloaked), which wipes anything inserted into the post.
+    // Re-place the line when that happens. One observer for the page's life,
+    // throttled to one check per animation frame, and a no-op unless this is a
+    // topic page for an anonymous reader whose article qualified.
+    var midWanted = false;
+    var midFrame = 0;
+    function watchCloaking() {
+      if (typeof MutationObserver !== "function") return;
+      new MutationObserver(function () {
+        if (!midWanted || midFrame) return;
+        midFrame = window.requestAnimationFrame(function () {
+          midFrame = 0;
+          if (!midWanted || document.getElementById(MID_ID)) return;
+          if (!isTopicPage() || !isAnonymous()) return;
+          var s = settings();
+          var href = s.enabled && s.signupPath ? safePath(s.signupPath) : null;
+          if (href) renderMid(href, bucketFor(categorySlug()));
+        });
+      }).observe(document.body, { childList: true, subtree: true });
     }
 
     // "Above suggested" — the reader has finished and is deciding what is next,
@@ -275,27 +426,31 @@
       }
     }
 
+    // Returns true when there is nothing left to do (both placed, or not
+    // applicable), so the poller can stop.
     function render() {
       var s = settings();
-      if (!s.enabled || !s.signupPath) return;
-      if (!isTopicPage() || !isAnonymous()) return;
-      if (document.getElementById(NODE_ID)) return;
-
-      var point = insertionPoint();
-      if (!point) return; // caller polls; Ember renders the topic asynchronously
+      if (!s.enabled || !s.signupPath) return true;
+      if (!isTopicPage() || !isAnonymous()) return false;
 
       var bucket = bucketFor(categorySlug());
       var signupHref = safePath(s.signupPath);
-      if (!signupHref) return;
-      var loginHref = s.loginPath ? safePath(s.loginPath) : null;
+      if (!signupHref) return true;
 
-      point.parent.insertBefore(
-        build(BUCKETS[bucket], bucket, signupHref, loginHref, s.ref),
-        point.before
-      );
-      alignToPost();
-      stopPolling();
-      console.log(LOG + "rendered for category '" + (categorySlug() || "unknown") + "'");
+      var midDone = renderMid(signupHref, bucket);
+
+      if (!document.getElementById(NODE_ID)) {
+        var point = insertionPoint();
+        if (!point) return false; // Ember renders the topic asynchronously
+        var loginHref = s.loginPath ? safePath(s.loginPath) : null;
+        point.parent.insertBefore(
+          build(BUCKETS[bucket], bucket, signupHref, loginHref, s.ref),
+          point.before
+        );
+        alignToPost();
+        console.log(LOG + "rendered for category '" + (categorySlug() || "unknown") + "'");
+      }
+      return midDone;
     }
 
     // Ember renders the topic after the route resolves, so the insertion point
@@ -303,13 +458,12 @@
     // spin forever on a page that will never have one.
     function renderWhenReady() {
       stopPolling();
-      render();
-      if (document.getElementById(NODE_ID)) return;
+      if (render() && document.getElementById(NODE_ID)) return;
       var elapsed = 0;
       pollTimer = setInterval(function () {
         elapsed += 250;
-        render();
-        if (document.getElementById(NODE_ID) || elapsed >= 10000) stopPolling();
+        var done = render();
+        if ((done && document.getElementById(NODE_ID)) || elapsed >= 10000) stopPolling();
       }, 250);
     }
 
@@ -320,7 +474,22 @@
     // — and, worse, leaves a stale CTA attached when the reader navigates to a
     // page that should not have one. This is the YOD-492 lesson, learned on the
     // beta-offer component.
+    // YOD-688: Discourse calls replaceState while the reader SCROLLS (the URL
+    // tracks the post number: /t/slug/123/7). Re-rendering on every call tore
+    // the box down and rebuilt it mid-read — harmless for the end box, but it
+    // would make the mid-article line jump under the reader. Only a change of
+    // page (a different topic, or leaving topics) re-renders now.
+    function pageKey() {
+      var m = /^\/t\/[^/]+\/(\d+)/.exec(window.location.pathname || "");
+      return m ? "t:" + m[1] : "p:" + (window.location.pathname || "");
+    }
+    var lastKey = pageKey();
+
     function onRouteChanged() {
+      var key = pageKey();
+      if (key === lastKey) return;
+      lastKey = key;
+      midWanted = false;
       remove();
       renderWhenReady();
     }
@@ -336,10 +505,15 @@
     });
     window.addEventListener("popstate", onRouteChanged);
 
-    if (document.readyState === "loading") {
-      document.addEventListener("DOMContentLoaded", renderWhenReady);
-    } else {
+    function boot() {
+      watchCloaking();
       renderWhenReady();
+    }
+
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", boot);
+    } else {
+      boot();
     }
   })();
 </script>

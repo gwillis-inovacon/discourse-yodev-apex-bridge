@@ -89,6 +89,38 @@ $yab-primary-ink: #1d00a5;
     color: #c7c4d8;
   }
 
+  &__body strong {
+    color: #fff;
+    font-weight: 600;
+  }
+
+  // YOD-688: benefits as ONE inline row ("a · b · c") that flows like a
+  // sentence. Inline, not flex: with flex each item wrapped as a unit and a
+  // phone showed a stacked list with a dot starting every line. The separator
+  // is attached to the END of each item (non-breaking), so a line can end on
+  // "·" but never start with one.
+  &__perks {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    font-size: 14px;
+    line-height: 1.6;
+    color: #d4e4fa;
+
+    li {
+      display: inline;
+      margin: 0;
+      padding: 0;
+    }
+
+    li:not(:last-child)::after {
+      content: "\00A0\00B7";
+      margin-right: 0.55em;
+      color: $yab-primary;
+      font-weight: 700;
+    }
+  }
+
   &__actions {
     margin: 10px 0 0;
     display: flex;
@@ -198,5 +230,37 @@ $yab-primary-ink: #1d00a5;
     &__secondary {
       width: 100%;
     }
+  }
+}
+
+// YOD-688: the mid-article line. Deliberately NOT the banner look: no panel,
+// no button, no glow — a muted aside between two paragraphs, sized like the
+// body text around it. Discourse's own colour variables, so it reads right in
+// both light and dark schemes.
+.yodev-apex-mid {
+  margin: 1.4em 0;
+  padding: 2px 0 2px 14px;
+  border-left: 3px solid var(--tertiary, #a3a0e6);
+  font-size: 0.92em;
+  line-height: 1.55;
+  color: var(--primary-medium, #8a8a8a);
+
+  &__icon {
+    margin-right: 6px;
+  }
+
+  // !important on every state for the same a:visited reason as the box CTA.
+  &__link,
+  &__link:link,
+  &__link:visited {
+    color: var(--tertiary, #6a67d8) !important;
+    font-weight: 600;
+    text-decoration: none !important;
+    white-space: nowrap;
+  }
+
+  &__link:hover,
+  &__link:focus {
+    text-decoration: underline !important;
   }
 }
