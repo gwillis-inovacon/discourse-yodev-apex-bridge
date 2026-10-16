@@ -39,9 +39,10 @@
         signupPath: readCssVar("--yodev-apex-bridge-signup"),
         loginPath: readCssVar("--yodev-apex-bridge-login"),
         ref: readCssVar("--yodev-apex-bridge-ref"),
-        enabled: readCssVar("--yodev-apex-bridge-enabled") === "1",
+        enabled: readCssVar("--yodev-apex-bridge-enabled") === "true",
         homepageUrl: readCssVar("--yodev-apex-bridge-homepage"),
-        redirectSignups: readCssVar("--yodev-apex-bridge-redirect") === "1",
+        // Fails closed: anything but the literal "true" means off.
+        redirectSignups: readCssVar("--yodev-apex-bridge-redirect") === "true",
       };
     }
 
@@ -533,10 +534,10 @@
     //     pass through Discourse's /login on the way back from the bridge;
     //     redirecting it would break every app login. Only in-app transitions
     //     to /login are redirected;
-    //   · /signup while an external login is mid-flight (Discourse's
-    //     `authentication_data` cookie). A new user who chose Google on the
-    //     homepage modal finishes their account on the forum's create-account
-    //     form; redirecting it would strand them.
+    //   · /signup and /login right after an external login came back
+    //     (#data-authentication, see externalAuthInFlight). A new user who
+    //     chose Google in the homepage modal finishes their account on the
+    //     forum's create-account form; redirecting it loops them.
     //
     // Not closed here (needs an auth decision, see YOD-761): a brand-new user
     // pressing a social button on the forum's login page still gets a forum
@@ -600,8 +601,21 @@
       return homepageSignupHref(s, window.location.href) || safePath(s.signupPath);
     }
 
-    function socialSignupInFlight() {
-      return /(?:^|;\s*)authentication_data=/.test(document.cookie || "");
+    // An external login (Google, LinkedIn, GitHub) just came back. Discourse
+    // 2026.10 renders the result into #data-authentication and then moves to
+    // /signup (new user: the create-account form) or /login (an error such as
+    // awaiting activation) — see its auth-complete instance initializer. Both
+    // must be left alone, or a Google signup started in the homepage modal is
+    // sent straight back to the modal: the loop Greg hit on 2026-10-15. The
+    // first version checked an `authentication_data` COOKIE, which this
+    // Discourse no longer sets. Remembered once seen, so a later DOM change
+    // cannot reopen the redirect during the same page.
+    var authResultSeen = false;
+    function externalAuthInFlight() {
+      if (authResultSeen) return true;
+      var el = document.getElementById("data-authentication");
+      if (el && el.dataset && el.dataset.authenticationData) authResultSeen = true;
+      return authResultSeen;
     }
 
     function sendToHomepage(returnUrl, why) {
@@ -640,9 +654,9 @@
         lastPage = window.location.href;
         return;
       }
+      if (externalAuthInFlight()) return;
       var returnUrl = lastPage || sameForumReferrer() || window.location.origin + "/";
       if (/^\/signup/.test(path)) {
-        if (socialSignupInFlight()) return;
         sendToHomepage(returnUrl, "signup-route");
         return;
       }
@@ -684,6 +698,7 @@
     window.addEventListener("popstate", function () { checkAuthRoute(false); });
 
     function boot() {
+      externalAuthInFlight();
       rememberReferral();
       checkAuthRoute(true);
       watchCloaking();

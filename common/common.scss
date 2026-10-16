@@ -6,9 +6,13 @@
   --yodev-apex-bridge-signup: "#{$signup_path}";
   --yodev-apex-bridge-login: "#{$login_path}";
   --yodev-apex-bridge-ref: "#{$ref_value}";
-  --yodev-apex-bridge-enabled: #{if($enabled, 1, 0)};
+  // Booleans pass through as TEXT ("true"/"false"). Discourse writes every
+  // setting as `$name: unquote("…")`, and Sass treats that string as truthy,
+  // so `if($enabled, 1, 0)` was ALWAYS 1: unticking a box did nothing
+  // (YOD-761, found 2026-10-15 when redirect_signups could not be turned off).
+  --yodev-apex-bridge-enabled: "#{$enabled}";
   --yodev-apex-bridge-homepage: "#{$homepage_url}";
-  --yodev-apex-bridge-redirect: #{if($redirect_signups, 1, 0)};
+  --yodev-apex-bridge-redirect: "#{$redirect_signups}";
 }
 
 // YOD-671: identical visual language to the two forum banners — the beta-offer
