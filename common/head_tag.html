@@ -539,9 +539,12 @@
     //     chose Google in the homepage modal finishes their account on the
     //     forum's create-account form; redirecting it loops them.
     //
-    // Not closed here (needs an auth decision, see YOD-761): a brand-new user
-    // pressing a social button on the forum's login page still gets a forum
-    // account, through that same create-account form.
+    // Except (YOD-763): a brand-new user who pressed a social button on the
+    // forum's OWN login page reaches that same create-account form. The two are
+    // told apart by where the login started, which Discourse writes into the
+    // auth result itself (see forumSocialSignupReturn); only the forum-started
+    // one goes to the homepage modal, where one more click on the same
+    // provider finishes the signup with its referral code and return.
 
     var AUTH_PATHS = /^\/(signup|login)\/?$/;
     var REFERRAL_KEY = "yodev_referral_code";
@@ -611,11 +614,53 @@
     // Discourse no longer sets. Remembered once seen, so a later DOM change
     // cannot reopen the redirect during the same page.
     var authResultSeen = false;
+    var authResult = null;
     function externalAuthInFlight() {
       if (authResultSeen) return true;
       var el = document.getElementById("data-authentication");
-      if (el && el.dataset && el.dataset.authenticationData) authResultSeen = true;
+      if (el && el.dataset && el.dataset.authenticationData) {
+        authResultSeen = true;
+        try {
+          authResult = JSON.parse(el.dataset.authenticationData);
+        } catch (e) {
+          authResult = null;
+        }
+      }
       return authResultSeen;
+    }
+
+    // YOD-763. Where should a NEW user's external login return them, if it
+    // started on the forum rather than in the homepage modal? null = leave the
+    // create-account form alone.
+    //
+    // Discourse puts the login's validated origin (path + query) into the auth
+    // result as destination_url (lib/auth/result.rb to_client_hash; 2026.10
+    // 60cbc8e). The homepage modal starts social signups with
+    // origin=/?yodev_signup=1 (AuthModal.tsx SIGNUP_RETURN_MARKER), so its
+    // marker arrives in server-rendered data. The URL copy of the marker is
+    // useless here: theme 53 strips it, and browsers differ on when.
+    //
+    // Fails closed: anything unexpected (unparseable data, no destination, an
+    // existing member, an invite or user-api-key flow) leaves the form alone,
+    // which is the pre-YOD-763 behaviour.
+    var SOCIAL_SIGNUP_MARKER = "yodev_signup";
+    function forumSocialSignupReturn() {
+      var r = authResult;
+      if (!r || typeof r !== "object") return null;
+      if (!r.auth_provider || r.authenticated) return null;
+      var dest = typeof r.destination_url === "string" ? r.destination_url : "";
+      if (dest.charAt(0) !== "/" || dest.charAt(1) === "/") return null;
+      var u;
+      try {
+        u = new URL(dest, window.location.origin);
+      } catch (e) {
+        return null;
+      }
+      if (u.origin !== window.location.origin) return null;
+      if (u.searchParams.has(SOCIAL_SIGNUP_MARKER)) return null;
+      if (/^\/(invites|user-api-key)\//.test(u.pathname)) return null;
+      if (AUTH_PATHS.test(u.pathname)) return window.location.origin + "/";
+      return u.href;
     }
 
     function sendToHomepage(returnUrl, why) {
@@ -654,7 +699,13 @@
         lastPage = window.location.href;
         return;
       }
-      if (externalAuthInFlight()) return;
+      if (externalAuthInFlight()) {
+        if (/^\/signup/.test(path)) {
+          var back = forumSocialSignupReturn();
+          if (back) sendToHomepage(back, "social-login-page");
+        }
+        return;
+      }
       var returnUrl = lastPage || sameForumReferrer() || window.location.origin + "/";
       if (/^\/signup/.test(path)) {
         sendToHomepage(returnUrl, "signup-route");
