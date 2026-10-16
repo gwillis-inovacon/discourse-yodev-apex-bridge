@@ -40,6 +40,8 @@
         loginPath: readCssVar("--yodev-apex-bridge-login"),
         ref: readCssVar("--yodev-apex-bridge-ref"),
         enabled: readCssVar("--yodev-apex-bridge-enabled") === "1",
+        homepageUrl: readCssVar("--yodev-apex-bridge-homepage"),
+        redirectSignups: readCssVar("--yodev-apex-bridge-redirect") === "1",
       };
     }
 
@@ -369,7 +371,7 @@
           if (!midWanted || document.getElementById(MID_ID)) return;
           if (!isTopicPage() || !isAnonymous()) return;
           var s = settings();
-          var href = s.enabled && s.signupPath ? safePath(s.signupPath) : null;
+          var href = s.enabled && s.signupPath ? signupTarget(s) : null;
           if (href) renderMid(href, bucketFor(categorySlug()));
         });
       }).observe(document.body, { childList: true, subtree: true });
@@ -434,7 +436,7 @@
       if (!isTopicPage() || !isAnonymous()) return false;
 
       var bucket = bucketFor(categorySlug());
-      var signupHref = safePath(s.signupPath);
+      var signupHref = signupTarget(s);
       if (!signupHref) return true;
 
       var midDone = renderMid(signupHref, bucket);
@@ -505,7 +507,185 @@
     });
     window.addEventListener("popstate", onRouteChanged);
 
+
+    // ─── One signup path (YOD-761) ──────────────────────────────────────
+    //
+    // Greg, 2026-10-15: there is ONE signup path, the homepage signup modal.
+    // The forum's own /signup has no referral-code field and skips what the
+    // homepage does at signup. So every way the forum asks an anonymous reader
+    // to sign up goes to the homepage instead:
+    //
+    //   https://yodev.dev/?signup=1&return=<this page>[&ref=CODE]
+    //
+    // The homepage opens its modal and, after confirmation, sends the new
+    // member back to `return` (homepage 5bbf2ea).
+    //
+    //   · header "Sign Up" / "Registrarse"     → click intercepted
+    //   · /signup, however it is reached       → redirected (the "Sign Up"
+    //     link on the login page, a typed URL, an old link)
+    //   · /login reached by an INTERACTION     → redirected: like, reply,
+    //     bookmark… An anonymous interaction lands on /login (measured
+    //     2026-10-15), and the modal offers "Ya tengo cuenta" to members.
+    //
+    // Left alone, deliberately:
+    //   · the header "Log In" button and the end box's "Ya tengo cuenta";
+    //   · a FULL PAGE LOAD of /login. Homepage, worX and Workplace sign-ins
+    //     pass through Discourse's /login on the way back from the bridge;
+    //     redirecting it would break every app login. Only in-app transitions
+    //     to /login are redirected;
+    //   · /signup while an external login is mid-flight (Discourse's
+    //     `authentication_data` cookie). A new user who chose Google on the
+    //     homepage modal finishes their account on the forum's create-account
+    //     form; redirecting it would strand them.
+    //
+    // Not closed here (needs an auth decision, see YOD-761): a brand-new user
+    // pressing a social button on the forum's login page still gets a forum
+    // account, through that same create-account form.
+
+    var AUTH_PATHS = /^\/(signup|login)\/?$/;
+    var REFERRAL_KEY = "yodev_referral_code";
+    var LOGIN_INTENT_MS = 3000;
+    var loginIntentAt = 0;
+    var bootPath = window.location.pathname || "";
+    var lastPage = AUTH_PATHS.test(bootPath) ? null : window.location.href;
+    // Discourse calls replaceState on boot and while scrolling without changing
+    // page. Only a change of PATH is a navigation; otherwise a direct load of
+    // /login (an app sign-in on its way back) would look like an interaction.
+    var lastPath = bootPath;
+    var leaving = false;
+
+    // https only; anything else is refused so a mistyped setting can never
+    // send readers somewhere unexpected.
+    function homepageOrigin(s) {
+      try {
+        var u = new URL(s.homepageUrl);
+        return u.protocol === "https:" ? u.origin : null;
+      } catch (e) {
+        return null;
+      }
+    }
+
+    // A referral code that arrived on a forum link (an influencer's channel,
+    // ?ref=CODE) rides along to the modal, which prefills and validates it.
+    // Letters and digits only, so placement labels like "comm-topic-end" are
+    // never mistaken for one.
+    function rememberReferral() {
+      try {
+        var code = new URLSearchParams(window.location.search).get("ref") || "";
+        code = code.trim().toUpperCase();
+        if (/^[A-Z0-9]{3,32}$/.test(code)) sessionStorage.setItem(REFERRAL_KEY, code);
+      } catch (e) {}
+    }
+
+    function storedReferral() {
+      try {
+        return sessionStorage.getItem(REFERRAL_KEY) || "";
+      } catch (e) {
+        return "";
+      }
+    }
+
+    function homepageSignupHref(s, returnUrl) {
+      var origin = homepageOrigin(s);
+      if (!origin) return null;
+      var q = "signup=1&return=" + encodeURIComponent(returnUrl || window.location.origin + "/");
+      var code = storedReferral();
+      if (code) q += "&ref=" + encodeURIComponent(code);
+      return origin + "/?" + q;
+    }
+
+    // What the end box and mid line link to: the homepage modal, or the old
+    // same-origin path if no homepage URL is configured.
+    function signupTarget(s) {
+      return homepageSignupHref(s, window.location.href) || safePath(s.signupPath);
+    }
+
+    function socialSignupInFlight() {
+      return /(?:^|;\s*)authentication_data=/.test(document.cookie || "");
+    }
+
+    function sendToHomepage(returnUrl, why) {
+      if (leaving) return;
+      var s = settings();
+      if (!s.redirectSignups || isSignedIn()) return;
+      var href = homepageSignupHref(s, returnUrl);
+      if (!href) {
+        console.warn(LOG + "homepage_url is not a usable https URL; leaving forum signup in place");
+        return;
+      }
+      leaving = true;
+      trackClick("forum-" + why, bucketFor(categorySlug()), "homepage-signup");
+      console.log(LOG + "signup → homepage (" + why + ")");
+      window.location.replace(href);
+    }
+
+    // Positive signal only: the avatar menu exists for members.
+    function isSignedIn() {
+      return !!document.querySelector("#current-user");
+    }
+
+    function sameForumReferrer() {
+      try {
+        var r = new URL(document.referrer);
+        if (r.origin === window.location.origin && !AUTH_PATHS.test(r.pathname)) return r.href;
+      } catch (e) {}
+      return null;
+    }
+
+    function checkAuthRoute(initialLoad) {
+      var path = window.location.pathname || "";
+      if (!initialLoad && path === lastPath) return;
+      lastPath = path;
+      if (!AUTH_PATHS.test(path)) {
+        lastPage = window.location.href;
+        return;
+      }
+      var returnUrl = lastPage || sameForumReferrer() || window.location.origin + "/";
+      if (/^\/signup/.test(path)) {
+        if (socialSignupInFlight()) return;
+        sendToHomepage(returnUrl, "signup-route");
+        return;
+      }
+      // /login
+      if (initialLoad) return; // app sign-ins pass through here: never touch
+      if (Date.now() - loginIntentAt < LOGIN_INTENT_MS) return; // header "Log In"
+      sendToHomepage(returnUrl, "interaction");
+    }
+
+    // Capture phase, so this runs before Ember's own handlers.
+    document.addEventListener(
+      "click",
+      function (e) {
+        var t = e.target && e.target.closest ? e.target : null;
+        if (!t) return;
+        if (t.closest(".login-button, .yodev-apex-bridge__secondary")) {
+          loginIntentAt = Date.now();
+          return;
+        }
+        if (t.closest(".sign-up-button")) {
+          var s = settings();
+          if (!s.redirectSignups || !homepageOrigin(s)) return;
+          e.preventDefault();
+          e.stopImmediatePropagation();
+          sendToHomepage(window.location.href, "header-button");
+        }
+      },
+      true
+    );
+
+    ["pushState", "replaceState"].forEach(function (method) {
+      var original = history[method];
+      history[method] = function () {
+        var result = original.apply(this, arguments);
+        window.setTimeout(function () { checkAuthRoute(false); }, 0);
+        return result;
+      };
+    });
+    window.addEventListener("popstate", function () { checkAuthRoute(false); });
+
     function boot() {
+      rememberReferral();
+      checkAuthRoute(true);
       watchCloaking();
       renderWhenReady();
     }

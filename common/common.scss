@@ -7,6 +7,8 @@
   --yodev-apex-bridge-login: "#{$login_path}";
   --yodev-apex-bridge-ref: "#{$ref_value}";
   --yodev-apex-bridge-enabled: #{if($enabled, 1, 0)};
+  --yodev-apex-bridge-homepage: "#{$homepage_url}";
+  --yodev-apex-bridge-redirect: #{if($redirect_signups, 1, 0)};
 }
 
 // YOD-671: identical visual language to the two forum banners — the beta-offer

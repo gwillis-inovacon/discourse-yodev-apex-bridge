@@ -2,13 +2,25 @@ signup_path:
   type: string
   default: "/signup"
   description:
-    en: "Forum path the primary CTA opens (Discourse's own signup). Must start with '/'. Blank disables the component entirely. YOD-671: signup happens in place on the forum, which creates the same yoDEV account as the homepage."
+    en: "Blank disables the end box and mid line. Otherwise only a FALLBACK: the CTAs open the homepage signup modal (homepage_url). This forum path is used only if homepage_url is not a usable https URL. Must start with '/'."
 
 login_path:
   type: string
   default: "/login"
   description:
     en: "Forum path for the secondary 'Ya tengo cuenta' link. Must start with '/'."
+
+homepage_url:
+  type: string
+  default: "https://yodev.dev"
+  description:
+    en: "YOD-761: the one signup path. Every forum signup trigger (header Sign Up, the end box, the mid line, /signup, an anonymous like or reply) opens <homepage_url>/?signup=1&return=<the forum page>. Must be https."
+
+redirect_signups:
+  type: bool
+  default: true
+  description:
+    en: "YOD-761: send the header Sign Up button, /signup and interaction-triggered /login to the homepage signup modal. Off = Discourse's own signup and login pages as before (the end box still links to homepage_url)."
 
 ref_value:
   type: string
